@@ -1,7 +1,7 @@
 from __future__ import annotations as _annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime,timezone
 from pathlib import Path
 from textwrap import wrap
 from typing import Any, List
@@ -14,7 +14,7 @@ from .load_records import Records, Zone, load_records
 
 __all__ = 'DNSServer', 'logger'
 
-SERIAL_NO = int((datetime.utcnow() - datetime(1970, 1, 1)).total_seconds())
+SERIAL_NO = int((datetime.now(timezone.utc) - datetime(1970, 1, 1,tzinfo=timezone.utc)).total_seconds())
 
 handler = logging.StreamHandler()
 handler.setLevel(logging.INFO)
