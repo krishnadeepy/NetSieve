@@ -1,7 +1,7 @@
 import time
-from  dnserver import DNSServer 
+from  dns import DNSServer 
 
-srv = DNSServer.from_toml('./zone.toml',port=53)
+srv = DNSServer.from_toml('./refs.toml',port=53)
 srv.start()
 
 time.sleep(100000)
