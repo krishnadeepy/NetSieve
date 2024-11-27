@@ -1,11 +1,15 @@
 import logging
-from dnslib import DNSRecord, QTYPE, RR, DNSLabel, dns
+from dnslib import DNSRecord, QTYPE, RR, DNSLabel, dns, RCODE
 from dnslib.server import DNSRecord, BaseResolver as LibBaseResolver, DNSServer
 from dnslib.server import DNSServer
 from typing import Optional, Dict, Any
 import socket
 import time
-from config import DNS_PORT, CLOUDFLARE_DNS, GOOGLE_DNS 
+from config import DNS_PORT
+
+# Use well-known public DNS servers
+DEFAULT_DNS = "1.1.1.1"  # Cloudflare
+FALLBACK_DNS = "8.8.8.8"  # Google 
 from models import HostEntry, SessionLocal
 
 # Configure logging
@@ -55,11 +59,12 @@ class DBBlockZone:
         return None
 
 class CustomDNSResolver(LibBaseResolver):
-    def __init__(self, upstream_dns: str = CLOUDFLARE_DNS):
+    def __init__(self, upstream_dns: str = DEFAULT_DNS):
         """Initialize resolver with block checker and upstream DNS."""
         super().__init__()
         self.block_checker = DBBlockZone()
         self.upstream_dns = upstream_dns
+        logger.info(f"Initializing DNS resolver with primary DNS: {upstream_dns}, fallback: {FALLBACK_DNS}")
 
     def resolve(self, request, handler):
         """Resolve DNS requests, blocking listed domains."""
@@ -67,31 +72,37 @@ class CustomDNSResolver(LibBaseResolver):
         
         # First check if hostname is blocked in database
         if self.block_checker.match(request.q.qname):
-            logger.info(f"Blocking access to {hostname}")
+            #logger.info(f"Blocking access to {hostname}")
             reply = request.reply()
             if request.q.qtype == QTYPE.A:
                 reply.add_answer(RR(request.q.qname, QTYPE.A, rdata=dns.A("0.0.0.0"), ttl=300))
             return reply
 
-        # If not blocked, forward to upstream DNS
-        logger.info(f"Forwarding query for {hostname}")
-        try:
-            # Create a new socket for upstream DNS query
-            sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(3)  # 3 second timeout
-            # Forward the raw query
-            sock.sendto(request.pack(), (self.upstream_dns, 53))
-            # Get the response
-            data, _ = sock.recvfrom(4096)
-            response = DNSRecord.parse(data)
-            return response
-        except Exception as e:
-            logger.error(f"Error resolving DNS query: {e}")
-            reply = request.reply()
-            reply.header.rcode = 2  # SERVFAIL
-            return reply
-        finally:
-            sock.close()
+        # Try primary and fallback DNS servers
+        #logger.info(f"Forwarding query for {hostname}")
+        dns_servers = [(self.upstream_dns, 53), (FALLBACK_DNS, 53)]
+        
+        for server in dns_servers:
+            sock = None
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.settimeout(3)
+                data = request.pack()
+                sock.sendto(data, server)
+                response_data, _ = sock.recvfrom(4096)
+                response = DNSRecord.parse(response_data)
+                return response
+            except (socket.timeout, socket.error) as e:
+                logger.error(f"Failed to reach DNS server {server[0]}:53 - Error: {str(e)}")
+                continue
+            finally:
+                if sock:
+                    sock.close()
+
+        logger.error("All DNS servers failed")
+        reply = request.reply()
+        reply.header.rcode = RCODE.SERVFAIL
+        return reply
   
 
 
@@ -103,7 +114,7 @@ def start_dns_server(port: int = DNS_PORT):
     dns_server = None
     try:
         # Create resolver
-        resolver = CustomDNSResolver(upstream_dns=CLOUDFLARE_DNS)
+        resolver = CustomDNSResolver(upstream_dns=DEFAULT_DNS)
         
         # Create and configure server
         dns_server = DNSServer(

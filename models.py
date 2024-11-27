@@ -30,7 +30,7 @@ class HostEntry(Base):
 # Construct the DATABASE_URL dynamically
 DATABASE_URL = f"postgresql+psycopg2://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}/{DATABASE_NAME}"
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL,pool_size=100, max_overflow=100)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Create the database tables if they don't exist
