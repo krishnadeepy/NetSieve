@@ -12,7 +12,7 @@ from dnslib.server import BaseResolver as LibBaseResolver, DNSServer as LibDNSSe
 
 from .load_records import Records, Zone, load_records
 
-__all__ = 'resolve','DNSServer', 'logger'
+#__all__ = 'resolve','DNSServer', 'logger'
 
 SERIAL_NO = int((datetime.now(timezone.utc) - datetime(1970, 1, 1,tzinfo=timezone.utc)).total_seconds())
 

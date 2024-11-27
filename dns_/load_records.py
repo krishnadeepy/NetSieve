@@ -11,7 +11,7 @@ try:
 except ImportError:
     from typing_extensions import Literal
 
-__all__ = 'load_records', 'RecordType', 'Zone'
+__all__ = 'Records','load_records', 'RecordType', 'Zone'
 
 RecordType = Literal[
     'A', 'AAAA', 'CAA', 'CNAME', 'DNSKEY', 'MX', 'NAPTR', 'NS', 'PTR', 'RRSIG', 'SOA', 'SRV', 'TXT', 'SPF'

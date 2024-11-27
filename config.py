@@ -26,3 +26,7 @@ URLS = {
     },
 }
 
+# DNS Settings
+DNS_PORT = 53
+CLOUDFLARE_DNS = "1.1.1.1"
+GOOGLE_DNS = "8.8.8.8"
