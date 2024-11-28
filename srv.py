@@ -5,7 +5,7 @@ from dnslib.server import DNSServer
 from typing import Optional, Dict, Any
 from models import HostEntry, SessionLocal
 import socket, os, time
-from config import DNS_PORT,EXPOSE_FLAG
+from config import EXPOSE_FLAG
 from dotenv import load_dotenv
 
 load_dotenv('.env.port')
