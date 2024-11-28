@@ -3,14 +3,23 @@ from dnslib import DNSRecord, QTYPE, RR, DNSLabel, dns, RCODE
 from dnslib.server import DNSRecord, BaseResolver as LibBaseResolver, DNSServer
 from dnslib.server import DNSServer
 from typing import Optional, Dict, Any
-import socket
-import time
-from config import DNS_PORT
+from models import HostEntry, SessionLocal
+import socket, os, time
+from config import DNS_PORT,EXPOSE_FLAG
+from dotenv import load_dotenv
+
+load_dotenv('.env.port')
+DNS_PORT = int(os.getenv("PORT"))
+
+
+if EXPOSE_FLAG:
+    os.system('ufw allow 53/udp')
+    os.system('ufw allow 53/tcp')
+
 
 # Use well-known public DNS servers
 DEFAULT_DNS = "1.1.1.1"  # Cloudflare
 FALLBACK_DNS = "8.8.8.8"  # Google 
-from models import HostEntry, SessionLocal
 
 # Configure logging
 logging.basicConfig(
@@ -22,8 +31,6 @@ logger = logging.getLogger(__name__)
 # Cloudflare and Google DNS Servers
 CLOUDFLARE_DNS = "1.1.1.1"
 GOOGLE_DNS = "8.8.8.8"
-DNS_PORT = 53
-
 
 class DBBlockZone:
     """A class that checks if domains are blocked in the database."""
