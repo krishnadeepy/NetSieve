@@ -68,6 +68,11 @@ class CustomDNSResolver(LibBaseResolver):
 
     def resolve(self, request, handler):
         """Resolve DNS requests, blocking listed domains."""
+
+        print('\n%%%%%%%%%%%%%%%%%%%%%REQUEST%%%%%%%%%%%%%%%%%%%%%\n')
+        print(request)
+        print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n')
+
         hostname = str(request.q.qname).rstrip('.')
         
         # First check if hostname is blocked in database
@@ -79,7 +84,7 @@ class CustomDNSResolver(LibBaseResolver):
             return reply
 
         # Try primary and fallback DNS servers
-        #logger.info(f"Forwarding query for {hostname}")
+        logger.info(f"Forwarding query for {hostname}")
         dns_servers = [(self.upstream_dns, 53), (FALLBACK_DNS, 53)]
         
         for server in dns_servers:
@@ -91,6 +96,10 @@ class CustomDNSResolver(LibBaseResolver):
                 sock.sendto(data, server)
                 response_data, _ = sock.recvfrom(4096)
                 response = DNSRecord.parse(response_data)
+                print('\n%%%%%%%%%%%%%%%%%%%%%RESPONSE%%%%%%%%%%%%%%%%%%%%%\n')
+                print(response)
+                print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n')
+
                 return response
             except (socket.timeout, socket.error) as e:
                 logger.error(f"Failed to reach DNS server {server[0]}:53 - Error: {str(e)}")
