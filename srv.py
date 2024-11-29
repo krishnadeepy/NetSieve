@@ -136,6 +136,7 @@ def start_dns_server(port: int = DNS_PORT):
         dns_server = DNSServer(
             resolver=resolver,
             port=port,
+            #tcp=True,
             address="0.0.0.0"
         )
         

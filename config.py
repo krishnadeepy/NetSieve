@@ -29,4 +29,4 @@ URLS = {
 # DNS Settings
 CLOUDFLARE_DNS = "1.1.1.1"
 GOOGLE_DNS = "8.8.8.8"
-EXPOSE_FLAG=False
+EXPOSE_FLAG = False
