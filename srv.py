@@ -1,5 +1,5 @@
-import logging
-from dnslib import DNSRecord, QTYPE, RR, DNSLabel, dns, RCODE
+import logging,json
+from dnslib import DNSRecord, QTYPE, RR, DNSLabel, dns, RCODE,A
 from dnslib.server import DNSRecord, BaseResolver as LibBaseResolver, DNSServer
 from dnslib.server import DNSServer
 from typing import Optional, Dict, Any
@@ -28,25 +28,18 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Cloudflare and Google DNS Servers
-CLOUDFLARE_DNS = "1.1.1.1"
-GOOGLE_DNS = "8.8.8.8"
-
 class DBBlockZone:
     """A class that checks if domains are blocked in the database."""
     def __init__(self):
-        # No need to call parent class init since we're only using the database
         self._cache: Dict[str, bool] = {}
 
     def match(self, q) -> bool:
         """Match a query against blocked hostnames in the database."""
         hostname = str(q).rstrip('.')
         
-        # Check cache first
         if hostname in self._cache:
             return self._cache[hostname]
             
-        # Query database
         with SessionLocal() as db_session:
             is_blocked = db_session.query(HostEntry).filter(HostEntry.hostname == hostname).first() is not None
             self._cache[hostname] = is_blocked
@@ -57,7 +50,6 @@ class DBBlockZone:
         hostname = str(q).rstrip('.')
         parts = hostname.split('.')
         
-        # Try each subdomain level
         for i in range(len(parts) - 1):
             domain = '.'.join(parts[i:])
             if self.match(domain):
@@ -73,13 +65,29 @@ class CustomDNSResolver(LibBaseResolver):
         self.upstream_dns = upstream_dns
         logger.info(f"Initializing DNS resolver with primary DNS: {upstream_dns}, fallback: {FALLBACK_DNS}")
 
+        self.local_records = {}
+        try:
+            with open('local.json', 'r') as file:
+                data = json.load(file)
+                for record in data.get('records', []):
+                    name = record.get('name')
+                    if name:
+                        # Store the record with the name as key
+                        self.local_records[name] = {
+                            'ip': record.get('ip'),
+                            'port': record.get('port')
+                        }
+        except FileNotFoundError:
+            print("Warning: local.json not found")
+        except json.JSONDecodeError:
+            print("Error: Invalid JSON format in local.json")
+
+
+
     def resolve(self, request, handler):
         """Resolve DNS requests, blocking listed domains."""
 
-        print('\n%%%%%%%%%%%%%%%%%%%%%REQUEST%%%%%%%%%%%%%%%%%%%%%\n')
-        print(request)
-        print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n')
-
+        
         hostname = str(request.q.qname).rstrip('.')
         
         # First check if hostname is blocked in database
@@ -89,6 +97,23 @@ class CustomDNSResolver(LibBaseResolver):
             if request.q.qtype == QTYPE.A:
                 reply.add_answer(RR(request.q.qname, QTYPE.A, rdata=dns.A("0.0.0.0"), ttl=300))
             return reply
+        
+        # First check local records
+        if hostname.rstrip('.') in self.local_records:
+            reply = request.reply()
+            local_record = self.local_records[hostname.rstrip('.')]
+            ip = local_record['ip']
+            reply.add_answer(RR(
+                rname=request.q.qname,
+                rtype=QTYPE.A,
+                rclass=1,
+                ttl=300,
+                rdata=A(ip)
+            ))
+            return reply
+
+        
+
 
         # Try primary and fallback DNS servers
         logger.info(f"Forwarding query for {hostname}")
@@ -103,9 +128,9 @@ class CustomDNSResolver(LibBaseResolver):
                 sock.sendto(data, server)
                 response_data, _ = sock.recvfrom(4096)
                 response = DNSRecord.parse(response_data)
-                print('\n%%%%%%%%%%%%%%%%%%%%%RESPONSE%%%%%%%%%%%%%%%%%%%%%\n')
-                print(response)
-                print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n')
+                # print('\n%%%%%%%%%%%%%%%%%%%%%RESPONSE%%%%%%%%%%%%%%%%%%%%%\n')
+                # print(response)
+                # print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n')
 
                 return response
             except (socket.timeout, socket.error) as e:
@@ -127,6 +152,9 @@ def start_dns_server(port: int = DNS_PORT):
     
     If port 53 requires elevated privileges, will automatically try port 10053.
     """
+    
+
+
     dns_server = None
     try:
         # Create resolver
