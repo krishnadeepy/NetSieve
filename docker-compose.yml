@@ -1,0 +1,22 @@
+services:
+  pgweb:
+    container_name: pgweb
+    restart: always
+    image: sosedoff/pgweb
+    ports: 
+      - "8081:8081" 
+    env_file:
+      - ./scripts/.env.prod
+
+
+  net-sieve-repo:
+    container_name: dns-server
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8888:8888/udp"  
+    volumes:
+      - ./scripts:/app 
+    command: python /app/srv.py
